@@ -2,6 +2,12 @@
 
 语音驱动的常驻 AI 助手（Windows 桌面应用）。按住热键说话 → 语音转写 → 常驻 agent 自主工作 → 结果语音/文字返回。基于 Tauri 2（Rust 后端 + 原生 JS 前端），模型为 MiniMax M3（1M token 上下文）。
 
+## 界面预览
+
+| 聊天（17 个工具直接调用） | 设置（密钥自备 + 全部可调） | 后台任务看板 |
+|---|---|---|
+| <img src="resources/images/chat_page.png" width="280"/> | <img src="resources/images/setting_page.png" width="280"/> | <img src="resources/images/task_page.png" width="280"/> |
+
 ## 功能
 
 - **语音交互**：热键按住说话、百度 ASR 转写、MiniMax TTS 朗读（可关）

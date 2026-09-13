@@ -24,6 +24,8 @@ pnpm tauri dev      # 开发
 
 ## 配置
 
+**开箱预设**：portable 包自带调优预设（`config.preset.json` + `assets/bg.jpg`）——背景图、双透明度、TTS 音色与语速、协作偏好提示词均已调好；首次启动自动播种，已有配置的老用户不受影响。提示词与全部 UI 参数可在「设置」页修改。
+
 首次启动在「设置」页填写（**自备，仓库不含任何密钥**）：
 
 - MiniMax API Key（chat + TTS）
@@ -40,6 +42,11 @@ openspec/            规格驱动开发：change 提案 → spec → tasks → a
 docs/superpowers/    开发日志（specs / plans / smoke 记录，AI 协作过程完整留痕）
 .claude/             openspec 技能套件（slash commands + skills）
 ```
+
+深入设计：
+
+- [设计哲学](docs/design-philosophy.md) —— 十条架构原则及其来源事故
+- [记忆机制](docs/memory.md) —— 四级漏斗：history → dream → 日/月/年 → MEMORY.md 索引
 
 开发约定见 [CLAUDE.md](CLAUDE.md)：feat 分支开发、master 只进 --no-ff 合并、openspec 全流程。
 

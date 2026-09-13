@@ -108,18 +108,21 @@ pub fn build_messages(events: &[HistoryEvent], pinned: &PinnedBlocks, _cap_after
 /// 剥除发送视图里的**双向**未配对 tool 交互（自愈层，只动视图不改盘，幂等）：
 /// ① assistant 侧：某 call 无对应 tool 消息时剥掉该 call，全剥空则整条转普通 assistant——
 ///    中断/崩溃留下的「assistant(tool_calls) 无配对 tool」中间孤儿会让 MiniMax 报 400 (2013)；
-/// ② tool 侧：call_id 为空（M3 偶发吐 name/id 双空畸形 call，2026-09-11 线上复现）或不在任何
-///    assistant call 里的 tool 消息整条剥掉——否则服务端报 400 (2013) "tool result's tool id() not found"。
+///    **name 为空的畸形 call 也剥**（M3 线上复现：空 name 通过不了服务端 tool_calls 结构校验，
+///    即使配对完整也 2013）；
+/// ② tool 侧：call_id 为空、或不在任何「合法」（id+name 齐全）assistant call 里的 tool 消息整条剥掉。
 /// 注：末尾孤儿仍由 drop_trailing_orphan 整条丢弃（更彻底）。
 pub(crate) fn strip_unpaired_tool_calls(msgs: &mut Vec<Value>) {
-    // 配对锚点：assistant 侧全部非空 call id
+    // 配对锚点：assistant 侧全部「合法」call（id 与 function.name 都非空）
     let mut called: std::collections::HashSet<String> = Default::default();
     for m in msgs.iter() {
         if m["role"] != "assistant" { continue; }
         if let Some(tcs) = m.get("tool_calls").and_then(|t| t.as_array()) {
             for c in tcs {
-                if let Some(id) = c["id"].as_str() {
-                    if !id.is_empty() { called.insert(id.to_string()); }
+                let id = c["id"].as_str().unwrap_or("");
+                let name = c["function"]["name"].as_str().unwrap_or("");
+                if !id.is_empty() && !name.is_empty() {
+                    called.insert(id.to_string());
                 }
             }
         }
@@ -133,14 +136,15 @@ pub(crate) fn strip_unpaired_tool_calls(msgs: &mut Vec<Value>) {
             }
         }
     }
-    // ① 剥 assistant 侧无应答的 call
+    // ① 剥 assistant 侧无应答/畸形（空 name）的 call
     for m in msgs.iter_mut() {
         if m["role"] != "assistant" { continue; }
         let Some(tcs) = m.get_mut("tool_calls").and_then(|t| t.as_array_mut()) else { continue };
         let before = tcs.len();
         tcs.retain(|c| {
             let id = c["id"].as_str().unwrap_or("");
-            !id.is_empty() && answered.get(id).copied().unwrap_or(0) >= 1
+            let name = c["function"]["name"].as_str().unwrap_or("");
+            !id.is_empty() && !name.is_empty() && answered.get(id).copied().unwrap_or(0) >= 1
         });
         if tcs.len() != before && tcs.is_empty() {
             // 全剥空：转普通 assistant（content 保留原值，可能为 null → 给空串防 API 拒空 content）
@@ -469,6 +473,32 @@ mod tests {
         // 后续正常配对恰好保留 1 组（ok1）
         let tools: Vec<&Value> = m.iter().filter(|x| x["role"] == "tool").collect();
         assert_eq!(tools.len(), 1, "正常配对的 tool 消息应保留: {m:#?}");
+    }
+
+    #[test]
+    fn empty_name_call_with_answer_stripped() {
+        // 2026-09-13 线上 400 (2013) 复现：M3 吐空 name call，合成 id 让配对"成立"，
+        // 但 assistant 回显里的 name:"" 过不了服务端结构校验 → 每轮 400。
+        // strip 须把空 name call 与其 tool_result 一并剥除，assistant 转普通空消息。
+        let malformed_call = serde_json::json!({
+            "id": "call_synth_0", "type": "function",
+            "function": {"name": "", "arguments": "{\"path\":\"render/x.png\"}"}
+        });
+        let mut evs = vec![
+            HistoryEvent::user(1, "main", "https://github.com/...", &[]),
+            HistoryEvent::assistant(2, "main", "", "", vec![malformed_call]),
+            HistoryEvent::tool_result(3, "main", "", "工具名为空（上一条 tool_call 是畸形输出…）", "call_synth_0"),
+        ];
+        let mut good = seq_events(&["assistant_tc", "tool", "assistant"]);
+        evs.append(&mut good);
+        let m = build_messages(&evs, &pinned("S"), 50);
+        assert!(m.iter().all(|x| x["role"] != "tool" || x["tool_call_id"].as_str().unwrap_or("") != "call_synth_0"),
+            "畸形 call 的 tool_result 须剥除: {m:#?}");
+        let bad = m.iter().find(|x| x["role"] == "assistant" && x["content"] == "").unwrap();
+        assert!(bad.get("tool_calls").is_none(), "空 name call 须从 assistant 剥除: {bad}");
+        // 正常配对恰好保留 1 组
+        let tools: Vec<&Value> = m.iter().filter(|x| x["role"] == "tool").collect();
+        assert_eq!(tools.len(), 1, "正常配对应保留: {m:#?}");
     }
 
     #[test]

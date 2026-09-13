@@ -973,19 +973,24 @@ impl ToolCallAccum {
         if let Some(a) = args { e.2.push_str(&a); }
     }
     fn finalize(self) -> Vec<Value> {
-        self.map.into_iter().map(|(idx, (id, name, args))| {
-            // 空 id 的 call 服务端无法配对（MiniMax 400 (2013) "tool result's tool id() not found"）。
-            // M3 偶发吐 name/id 双空的畸形 call（2026-09-11 线上复现）。合成稳定 id 让
-            // echo 与 tool_result 恒配对；name 为空时 dispatch 走「未知工具」臂给模型反馈，可自行纠正。
+        self.map.into_iter().filter_map(|(idx, (id, name, args))| {
+            // 空 name 的 call 是模型畸形输出（M3 线上两次复现：name/id 双空）。它无法被执行、
+            // 也无法通过服务端 tool_calls 结构校验（MiniMax 400 (2013)）——直接丢弃，绝不落盘/
+            // 进 echo：合成 id 曾让它"配对成立"，反而把毒保活成每轮 400 死循环。
+            // name 非空而 id 缺失 → 合成稳定 id，echo 与 tool_result 恒配对。
+            let name = match name {
+                Some(n) if !n.is_empty() => n,
+                _ => return None,
+            };
             let id = match id {
                 Some(s) if !s.is_empty() => s,
                 _ => format!("call_synth_{idx}"),
             };
-            json!({
+            Some(json!({
                 "id": id,
                 "type": "function",
-                "function": { "name": name.unwrap_or_default(), "arguments": args }
-            })
+                "function": { "name": name, "arguments": args }
+            }))
         }).collect()
     }
 }
@@ -1118,16 +1123,16 @@ mod tests {
     }
 
     #[test]
-    fn accum_synthesizes_id_for_malformed_call() {
-        // 空/缺 id 的畸形 call（M3 线上复现）→ 合成 call_synth_N，echo 与 tool_result 恒配对
+    fn accum_synthesizes_id_and_drops_empty_name() {
+        // 空/缺 id 的 call → 合成 call_synth_N；空 name 的畸形 call → 整条丢弃（不落盘不进 echo）
         let mut a = ToolCallAccum::new();
         a.push(0, None, Some("display".into()), Some("{}".into()));
         a.push(1, Some("".into()), Some("".into()), Some("{}".into()));
         a.push(2, Some("call_x".into()), Some("bash".into()), Some("{}".into()));
         let v = a.finalize();
+        assert_eq!(v.len(), 2, "空 name 畸形 call 须丢弃: {v:?}");
         assert!(v[0]["id"].as_str().unwrap().starts_with("call_synth_0"), "缺 id 须合成: {}", v[0]);
-        assert!(v[1]["id"].as_str().unwrap().starts_with("call_synth_1"), "空 id 须合成: {}", v[1]);
-        assert_eq!(v[2]["id"], "call_x", "合法 id 原样保留");
+        assert_eq!(v[1]["id"], "call_x", "合法 id 原样保留");
     }
 
     #[test]

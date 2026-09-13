@@ -1,0 +1,58 @@
+[package]
+name = "ovoice"
+version = "0.1.0"
+description = "MiniMax LLM + TTS desktop app"
+authors = ["you"]
+edition = "2021"
+default-run = "ovoice"
+
+[lib]
+# The `_lib` suffix avoids a name clash with the bin on Windows.
+name = "ovoice_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "mem"
+path = "src/bin/mem.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+bytes = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "process"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+dotenvy = "0.15"
+base64 = "0.22"
+sha2 = "0.10"
+hex = "0.4"
+uuid = { version = "1", features = ["v4"] }
+async-trait = "0.1"
+thiserror = "1"
+# 全局推说话：cpal 录音（WASAPI），windows-sys 读全局按键状态（GetAsyncKeyState）
+cpal = "0.15"
+windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Time", "Win32_Globalization", "Win32_Security"] }
+encoding_rs = "0.8"
+percent-encoding = "2"
+# 用系统默认浏览器打开消息里的外链
+tauri-plugin-opener = "2"
+# 设置页工作目录的文件夹选择弹窗
+tauri-plugin-dialog = "2"
+zip = "8.6.0"
+quick-xml = "0.41.0"
+pdf-extract = "0.12.0"
+# 跨平台杀树原语（替 win_job；前台超时杀 sh + & 后代）。default=blocking（无 tokio feature）。spec D6。
+kill_tree = "0.2.4"
+regex = "1"
+# 任务管理子系统：sqlite（bundled 静态编 C 源进二进制，无外部 dll）
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[dev-dependencies]
+hound = "3.5"
+tempfile = "3"

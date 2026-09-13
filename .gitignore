@@ -1,0 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# 本地密钥，切勿提交
+.env
+*.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# mem cli 离线测试 scratch（手工造数据，非源码）
+mem-test-ws/
+
+# dev 运行可能把 cache 泄漏到仓库根（workspace 默认 ./ovoice 兜底时的产物）；cache 非源码
+src-tauri/ovoice/
+
+# Claude Code 本地 scratch：只 ignore worktrees（git worktree 元数据）和会话产物
+# skills/ 和 commands/ 是项目级共享资源（openspec skill 套件），保留并随仓库分发
+/.claude/worktrees/
+
+# release 产物（portable 绿色包等 exe），非源码——勿提交
+release/
+
+# Tauri externalBin release 产物（target-triple 特定 + busybox 二进制），非源码（CLAUDE.md 约定）
+src-tauri/binaries/

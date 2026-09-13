@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/vendor/github-dark.min.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ovoice · MiniMax</title>
+    <!-- markdown 渲染三件套（UMD，无打包器；经典脚本先于 deferred 的 main.js 执行） -->
+    <script src="/vendor/markdown-it.min.js"></script>
+    <script src="/vendor/purify.min.js"></script>
+    <script src="/vendor/highlight.min.js"></script>
+    <script src="/vendor/jszip.min.js"></script>
+    <script src="/vendor/docx-preview.min.js"></script>
+    <script src="/vendor/papaparse.min.js"></script>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+  <body>
+    <!-- 全局背景图层：fixed 全屏，铺底；所有视图切换时不动 -->
+    <div id="bg-layer" aria-hidden="true"></div>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand-group">
+          <img class="brand-logo" src="/assets/logo.png" alt="ovoice" />
+          <h1>ovoice</h1>
+          <span class="subtitle" id="subtitle">MiniMax · M3</span>
+        </div>
+        <div class="titlebar-spacer"></div>
+        <div class="topbar-actions">
+        <button id="jobs-btn" class="icon-btn text-btn" type="button" aria-label="任务" title="后台任务">任务</button>
+        <button id="tasks-btn" class="icon-btn text-btn" type="button" aria-label="任务看板" title="任务看板">看板</button>
+        <button id="scheduler-btn" class="icon-btn text-btn" type="button" aria-label="定时" title="定时任务">定时</button>
+        <button id="settings-btn" class="icon-btn" type="button" aria-label="设置" title="设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 003.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H8a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V8a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+        </button>
+        </div>
+        <div class="win-controls">
+          <button id="win-min" class="win-btn" type="button" aria-label="最小化" title="最小化">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true"><line x1="2.5" y1="6" x2="9.5" y2="6"/></svg>
+          </button>
+          <button id="win-max" class="win-btn win-max" type="button" aria-label="最大化" title="最大化">
+            <svg class="ic-max" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="0.6"/></svg>
+            <svg class="ic-restore" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="2.5" y="3.7" width="5.8" height="5.8" rx="0.6"/><path d="M4.5 3.7V2.5h5.8v5.8H9.1"/></svg>
+          </button>
+          <button id="win-close" class="win-btn win-close" type="button" aria-label="关闭" title="关闭">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="3" x2="9" y2="9"/><line x1="9" y1="3" x2="3" y2="9"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- 聊天视图 -->
+      <section id="chat-view" class="view">
+        <div id="messages" class="messages"></div>
+        <form id="chat-form" class="composer">
+          <div id="attach-bar" class="attach-bar" hidden></div>
+          <div class="composer-row">
+          <button id="mic-btn" class="mic-btn" type="button" aria-label="语音输入" title="语音输入">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5 11a7 7 0 0014 0M12 18v3" />
+            </svg>
+          </button>
+          <button id="attach-btn" class="attach-btn" type="button" aria-label="添加附件" title="添加附件">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
+          <textarea id="chat-input" placeholder="输入消息，Enter 发送 / Shift+Enter 换行…" rows="1" autofocus></textarea>
+          <button type="submit" id="send-btn" aria-label="发送" title="发送">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 19V5M6 11l6-6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <button id="interrupt-btn" type="button" aria-label="中断当前任务" title="中断当前任务" hidden>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" />
+            </svg>
+          </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 设置视图 -->
+      <section id="settings-view" class="view settings" hidden>
+        <form id="config-form" class="settings-form">
+          <div class="settings-scroll">
+            <div class="group">
+              <div class="group-title">MiniMax 账号</div>
+              <label class="row">
+                <span>API Key</span>
+                <input id="cfg-api-key" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">对话 (LLM)</div>
+              <label class="row">
+                <span>模型</span>
+                <input id="cfg-llm-model" type="text" spellcheck="false" />
+              </label>
+              <label class="row row-col">
+                <span>System Prompt</span>
+                <textarea id="cfg-system-prompt" rows="3"></textarea>
+              </label>
+              <label class="row">
+                <span>用户提示词前缀 <input id="cfg-user-prefix-enabled" type="checkbox" style="margin-left:6px;vertical-align:middle"> 启用</span>
+              </label>
+              <label class="row row-col">
+                <span>前缀文本（每条用户输入发给助手前拼接；典型：做事与思考逻辑）</span>
+                <textarea id="cfg-user-prefix" rows="4" spellcheck="false"></textarea>
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">Agent 工作目录</div>
+              <label class="row row-col">
+                <span>工作目录（write/read/bash 相对路径根；你的文件放这里）</span>
+                <div class="pick-row">
+                  <input id="cfg-workspace" type="text" spellcheck="false" placeholder="留空 = 默认 Documents/ovoice" />
+                  <button id="cfg-workspace-pick" type="button" class="link-btn">选择…</button>
+                </div>
+              </label>
+              <label class="row row-col">
+                <span>缓存目录（记忆/对话历史/人格/日志；ovoice 内部产物，留空 = 默认 app_data/cache）</span>
+                <div class="pick-row">
+                  <input id="cfg-cache" type="text" spellcheck="false" placeholder="留空 = 默认 app_data/cache" />
+                  <button id="cfg-cache-pick" type="button" class="link-btn">选择…</button>
+                </div>
+              </label>
+              <label class="row">
+                <span>子代理最大并发数（默认 4；0=禁用）</span>
+                <input id="cfg-max-subagents" type="number" min="0" max="32" step="1" />
+              </label>
+              <label class="row">
+                <span>记忆整理 · 闲置触发（秒，距上次活动的空闲时长触发 dream；高级）</span>
+                <input id="cfg-dream-idle-secs" type="number" min="0" max="86400" step="10" />
+              </label>
+              <label class="row">
+                <span>记忆整理 · 上下文长度触发（context input token 达此值触发 dream，留最近 3 回合；默认 300000；高级）</span>
+                <input id="cfg-dream-context-trigger-tokens" type="number" min="0" step="1000" />
+              </label>
+              <label class="row">
+                <span>记忆整理 · dream 触发后保留的 message 条数（token 触发后 context 留最近几条对话；默认 3；高级）</span>
+                <input id="cfg-dream-cap-turns" type="number" min="1" max="500" step="1" />
+              </label>
+              <label class="row">
+                <span>显示窗口大小（可见气泡数；上下划滑动加载）</span>
+                <input id="cfg-display-window-size" type="number" min="5" max="500" step="1" />
+              </label>
+              <label class="row">
+                <span>单轮工具调用上限（一轮内最多调用工具的次数；超出则结束本轮；默认 100）</span>
+                <input id="cfg-max-tool-iters" type="number" min="1" max="1000" step="1" />
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">附件</div>
+              <label class="row">
+                <span>单个附件大小上限（MB；图片恒≤10）</span>
+                <input id="cfg-max-attachment-mb" type="number" min="1" max="100" step="1" />
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">语音 (TTS)</div>
+              <label class="row">
+                <span>模型</span>
+                <select id="cfg-tts-model">
+                  <option value="speech-2.8-hd">speech-2.8-hd</option>
+                  <option value="speech-2.8-turbo">speech-2.8-turbo</option>
+                  <option value="speech-02-hd">speech-02-hd</option>
+                  <option value="speech-02-turbo">speech-02-turbo</option>
+                </select>
+              </label>
+              <label class="row row-col">
+                <span>音色 ID</span>
+                <select id="cfg-voice-id"></select>
+              </label>
+              <label class="row row-col">
+                <span>自定义音色（id + 别名，点添加；保存后写入 config.json）</span>
+                <div class="pick-row">
+                  <input id="cfg-voice-id-custom" type="text" spellcheck="false" placeholder="音色 id，如 female-yujie" />
+                  <input id="cfg-voice-label-custom" type="text" spellcheck="false" placeholder="别名（可选）" />
+                  <button id="cfg-add-voice" type="button" class="link-btn">添加</button>
+                </div>
+              </label>
+              <label class="row">
+                <span>语速</span>
+                <input id="cfg-speed" type="number" min="0.5" max="2" step="0.1" />
+              </label>
+              <label class="row">
+                <span>音量</span>
+                <input id="cfg-vol" type="number" min="0" max="10" step="0.5" />
+              </label>
+              <label class="row">
+                <span>音调</span>
+                <input id="cfg-pitch" type="number" min="-12" max="12" step="1" />
+              </label>
+              <label class="row">
+                <span>格式</span>
+                <select id="cfg-audio-format">
+                  <option value="mp3">mp3</option>
+                  <option value="wav">wav</option>
+                  <option value="flac">flac</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">百度语音识别 (ASR · 麦克风输入)</div>
+              <label class="row">
+                <span>App ID</span>
+                <input id="cfg-baidu-appid" type="number" />
+              </label>
+              <label class="row">
+                <span>API Key</span>
+                <input id="cfg-baidu-apikey" type="text" spellcheck="false" />
+              </label>
+              <label class="row">
+                <span>Secret Key</span>
+                <input id="cfg-baidu-secret" type="password" spellcheck="false" />
+              </label>
+              <label class="row">
+                <span>dev_pid</span>
+                <input id="cfg-baidu-devpid" type="number" />
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">全局推说话 (热键)</div>
+              <label class="row">
+                <span>触发方式</span>
+                <select id="cfg-voice-trigger">
+                  <option value="hold">双击 Ctrl + 按住（松开结束）</option>
+                  <option value="toggle">双击 Ctrl 开 / 再按一次停</option>
+                </select>
+              </label>
+              <label class="row">
+                <span>按住开录延时 (毫秒，仅「按住」模式)</span>
+                <input id="cfg-hold-gate" type="number" min="50" max="10000" step="50" />
+              </label>
+              <label class="row">
+                <span>识别完成后</span>
+                <select id="cfg-voice-action">
+                  <option value="send">立即发送给助手</option>
+                  <option value="insert">填入输入框（不发送）</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="group">
+              <div class="group-title">外观 · 背景</div>
+              <label class="row">
+                <span>启用背景图</span>
+                <input id="cfg-bg-enabled" type="checkbox" />
+              </label>
+              <label class="row row-col">
+                <span>背景图片（磁盘任意位置；删除/移动后自动回退无背景）</span>
+                <div class="pick-row">
+                  <input id="cfg-bg-path" type="text" spellcheck="false" placeholder="未选择" />
+                  <button id="cfg-bg-pick" type="button" class="link-btn">选择…</button>
+                  <button id="cfg-bg-clear" type="button" class="link-btn">清除</button>
+                </div>
+              </label>
+              <label class="row row-col">
+                <span>明暗遮罩 <span id="cfg-bg-opacity-val" class="hint">0.35</span>（0=原图，1=最淡）</span>
+                <input id="cfg-bg-opacity" type="range" min="0" max="1" step="0.05" />
+              </label>
+              <label class="row row-col">
+                <span>面板/气泡 不透明度 <span id="cfg-glass-opacity-val" class="hint">0.85</span>（0=全透，1=不透）</span>
+                <input id="cfg-glass-opacity" type="range" min="0" max="1" step="0.05" />
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <button type="button" id="settings-back" class="link-btn">取消</button>
+            <button type="submit" id="settings-save" class="primary-btn">保存</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 任务视图 -->
+      <section id="jobs-view" class="view jobs-view" hidden>
+        <header class="jobs-topbar">
+          <div class="jobs-title">
+            <h2>后台任务</h2>
+            <span id="jobs-sub" class="jobs-sub">管理 agent 触发的长任务</span>
+          </div>
+          <div class="jobs-topbar-actions">
+            <button id="jobs-refresh" type="button" class="link-btn">刷新</button>
+            <button id="jobs-back" type="button" class="link-btn">返回对话</button>
+          </div>
+        </header>
+
+        <div class="jobs-stats" id="jobs-stats"></div>
+
+        <div class="jobs-scroll">
+          <div id="jobs-list" class="jobs-list"></div>
+          <div id="jobs-empty" class="jobs-empty" hidden>
+            <p>还没有后台任务</p>
+            <span>在对话里让 agent 执行长任务（如「生成一段视频」），它会自动转到后台，完成后回来汇报。</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 任务看板视图 -->
+      <section id="tasks-view" class="view jobs-view" hidden>
+        <header class="jobs-topbar">
+          <div class="jobs-title">
+            <h2>任务看板</h2>
+            <span id="tasks-sub" class="jobs-sub">agent 的当前工作记忆——跨会话持续推进的目标</span>
+          </div>
+          <div class="jobs-topbar-actions">
+            <label class="row" style="flex-direction:row;align-items:center;gap:6px;flex:0 0 auto">
+              <span style="white-space:nowrap">归档</span>
+              <input id="tasks-show-archived" type="checkbox" />
+            </label>
+            <button id="tasks-new" type="button" class="link-btn">新建</button>
+            <button id="tasks-refresh" type="button" class="link-btn">刷新</button>
+            <button id="tasks-back" type="button" class="link-btn">返回对话</button>
+          </div>
+        </header>
+
+        <div class="tasks-board" id="tasks-board">
+          <div class="kanban-col" data-horizon="current">
+            <div class="kanban-col-head"><span class="kanban-h current">当前</span><span class="kanban-count" data-count="current">0</span></div>
+            <div class="kanban-cards" id="tasks-current-list"></div>
+          </div>
+          <div class="kanban-col" data-horizon="short">
+            <div class="kanban-col-head"><span class="kanban-h short">短期</span><span class="kanban-count" data-count="short">0</span></div>
+            <div class="kanban-cards" id="tasks-short-list"></div>
+          </div>
+          <div class="kanban-col" data-horizon="long">
+            <div class="kanban-col-head"><span class="kanban-h long">长期</span><span class="kanban-count" data-count="long">0</span></div>
+            <div class="kanban-cards" id="tasks-long-list"></div>
+          </div>
+          <div class="kanban-col" data-horizon="vision">
+            <div class="kanban-col-head"><span class="kanban-h vision">愿景</span><span class="kanban-count" data-count="vision">0</span></div>
+            <div class="kanban-cards" id="tasks-vision-list"></div>
+          </div>
+        </div>
+
+        <div id="tasks-empty" class="jobs-empty" hidden>
+          <p>还没有任务</p>
+          <span>在对话里让 agent「登记一个任务」，或点「新建」手动加。任务板是 agent 跨会话持续推进目标的当前工作记忆。</span>
+        </div>
+      </section>
+
+      <!-- 任务编辑弹层 -->
+      <div id="task-modal" class="task-modal" hidden>
+        <div class="task-modal-card">
+          <header class="task-modal-head">
+            <h3 id="task-modal-title">新建任务</h3>
+            <button type="button" id="task-modal-close" class="link-btn">×</button>
+          </header>
+          <div class="task-modal-body">
+            <label class="task-field"><span>标题</span><input id="task-f-title" type="text" /></label>
+            <label class="task-field"><span>目标/动机</span><textarea id="task-f-goal" rows="2"></textarea></label>
+            <label class="task-field"><span>背景细节</span><textarea id="task-f-detail" rows="3"></textarea></label>
+            <div class="task-field-row">
+              <label class="task-field"><span>时间视野</span>
+                <select id="task-f-horizon">
+                  <option value="current">当前</option><option value="short">短期</option>
+                  <option value="long">长期</option><option value="vision">愿景</option>
+                </select>
+              </label>
+              <label class="task-field"><span>状态</span>
+                <select id="task-f-status">
+                  <option value="todo">todo</option><option value="active">active</option>
+                  <option value="done">done</option><option value="dropped">dropped</option>
+                </select>
+              </label>
+            </div>
+            <div class="task-field-row">
+              <label class="task-field"><span>父任务 id（可选）</span><input id="task-f-parent" type="number" /></label>
+              <label class="task-field"><span>截止（毫秒，可选）</span><input id="task-f-due" type="number" /></label>
+            </div>
+            <label class="task-field"><span>标签（逗号分隔）</span><input id="task-f-tags" type="text" /></label>
+            <details class="task-acceptance-wrap">
+              <summary>验收清单（每行一条）</summary>
+              <textarea id="task-f-acceptance" rows="4" placeholder="第1章&#10;第2章&#10;校对"></textarea>
+            </details>
+            <div id="task-f-meta" class="task-meta" hidden></div>
+            <div id="task-f-blockers" class="task-blockers" hidden></div>
+          </div>
+          <footer class="task-modal-foot">
+            <button type="button" id="task-modal-archive" class="link-btn" hidden>归档</button>
+            <button type="button" id="task-modal-delete" class="link-btn danger" hidden>删除</button>
+            <span class="spacer"></span>
+            <button type="button" id="task-modal-cancel" class="link-btn">取消</button>
+            <button type="button" id="task-modal-save" class="primary-btn">保存</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- 定时任务视图 -->
+      <section id="scheduler-view" class="view jobs-view" hidden>
+        <header class="jobs-topbar">
+          <div class="jobs-title">
+            <h2>定时任务</h2>
+            <span id="sched-sub" class="jobs-sub">到点自动把提示词投递给 agent(模拟一条用户输入)</span>
+          </div>
+          <div class="jobs-topbar-actions">
+            <label class="row" style="flex-direction:row;align-items:center;gap:6px"><span style="white-space:nowrap">全局</span><input id="sched-global" type="checkbox" /></label>
+            <button id="sched-new" type="button" class="link-btn">新建</button>
+            <button id="sched-refresh" type="button" class="link-btn">刷新</button>
+            <button id="sched-back" type="button" class="link-btn">返回对话</button>
+          </div>
+        </header>
+
+        <div class="jobs-scroll">
+          <form id="sched-form" class="settings-form" hidden style="margin:12px 0;padding:12px;border:1px solid var(--glass-border,#333);border-radius:8px">
+            <input type="hidden" name="task_id" />
+            <div class="group-title">定时任务编辑</div>
+            <label class="row"><span>名称</span><input name="name" type="text" spellcheck="false" placeholder="如:每日任务提醒" /></label>
+            <label class="row"><span>触发方式</span>
+              <select name="mode"><option value="interval">按间隔</option><option value="schedule">指定时点</option></select>
+            </label>
+            <label class="row"><span>次数</span>
+              <select name="count"><option value="forever">无数次</option><option value="once">一次(触发后停)</option></select>
+            </label>
+            <label class="row" data-iv><span>间隔</span>
+              <span style="display:flex;gap:6px"><input name="iv_value" type="number" min="1" step="1" style="width:90px" />
+              <select name="iv_unit"><option value="sec">秒</option><option value="min" selected>分</option><option value="hour">时</option><option value="day">天</option></select></span>
+            </label>
+            <label class="row" data-sc hidden><span>时点(本地)</span>
+              <span style="display:flex;gap:6px;flex-wrap:wrap">
+                <input name="sc_time" type="text" placeholder="09:00" style="width:80px" />
+                <select name="sc_repeat"><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option></select>
+                <input name="sc_weekdays" type="text" placeholder="周几,0=日..6=六" style="width:130px" title="weekly 用:逗号分隔,如 1,3,5" />
+                <input name="sc_month" type="number" placeholder="月" min="1" max="12" style="width:60px" title="yearly 用" />
+                <input name="sc_day" type="number" placeholder="号" min="1" max="31" style="width:60px" title="monthly/yearly 用" />
+              </span>
+            </label>
+            <label class="row row-col"><span>提示词 action(到点投给 agent)</span>
+              <textarea name="action" rows="3" placeholder="如:列出今天要做的事,提醒用户先做哪个"></textarea>
+            </label>
+            <label class="row row-col"><span>注入参考(每行一个路径,可选)</span>
+              <textarea name="context_inject" rows="2" placeholder="如:projects/ovoice-test/README.md" spellcheck="false"></textarea>
+            </label>
+            <label class="row"><span>启用</span><input name="enabled" type="checkbox" /></label>
+            <div class="settings-actions">
+              <button type="button" id="sched-cancel" class="link-btn">取消</button>
+              <button type="submit" class="primary-btn">保存</button>
+            </div>
+          </form>
+
+          <div id="scheduler-list" class="jobs-list"></div>
+          <div id="scheduler-empty" class="jobs-empty" hidden>
+            <p>还没有定时任务</p>
+            <span>点「新建」配置一个,或让 agent 自己用 create_timer 工具建。</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ask_user 快速问答面板：一步式（点选项直接提交/跳过）+ 15s 倒计时（暂停+续倒） -->
+    <div id="ask-user-modal" class="ask-modal" hidden>
+      <div class="ask-modal__panel">
+        <div class="ask-modal__header">
+          <span class="ask-modal__q-icon">❓</span>
+          <span id="ask-modal-question" class="ask-modal__q-text"></span>
+          <span id="ask-modal-timer" class="ask-modal__timer">15s</span>
+        </div>
+        <div id="ask-modal-context" class="ask-modal__context" hidden></div>
+        <div id="ask-modal-options" class="ask-modal__options"></div>
+        <div id="ask-modal-custom" class="ask-modal__custom">
+          <textarea id="ask-modal-custom-input" placeholder="都不满意？直接输入你的答案（Enter 提交，Shift+Enter 换行）" rows="2"></textarea>
+        </div>
+        <div class="ask-modal__actions">
+          <button id="ask-modal-skip" class="ask-modal__btn" type="button">跳过</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

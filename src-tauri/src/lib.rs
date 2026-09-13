@@ -370,7 +370,15 @@ fn get_background(app: AppHandle) -> BgResponse {
     if trimmed.is_empty() {
         return BgResponse { url: None, opacity, glass };
     }
-    let path = std::path::PathBuf::from(trimmed);
+    let mut path = std::path::PathBuf::from(trimmed);
+    if !path.is_absolute() {
+        // 相对路径按 exe 同目录解析（portable 预设 assets/bg.jpg）：CWD 不可靠，exe 目录才稳定。
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                path = dir.join(path);
+            }
+        }
+    }
     let url = match std::fs::read(&path) {
         Ok(bytes) => {
             let mime = mime_from_ext(&path);

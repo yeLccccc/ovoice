@@ -249,6 +249,13 @@ pub fn default_workspace_dir() -> PathBuf {
 pub fn load_from(dir: &Path) -> Config {
     let _ = std::fs::create_dir_all(dir);
     let path = path_in(dir);
+    // 首启播种：目标 config 不存在且 exe 旁有 config.preset.json（portable 附带的调优预设）
+    // → 拷为初始配置。已有配置的老用户完全不受影响（存在即不播）。
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            seed_preset_config(&path, exe_dir);
+        }
+    }
     let mut cfg = match std::fs::read_to_string(&path) {
         Ok(s) => serde_json::from_str::<Config>(&s).unwrap_or_else(|_| Config::default()),
         Err(_) => Config::default(),
@@ -256,6 +263,18 @@ pub fn load_from(dir: &Path) -> Config {
     cfg.workspace_dir = resolve_workspace(&cfg.workspace_dir, dir).to_string_lossy().to_string();
     cfg.cache_dir = resolve_cache_dir(&cfg.cache_dir, dir).to_string_lossy().to_string();
     cfg
+}
+
+/// 首启播种（纯函数便于测试）：config 不存在且 exe 目录有 config.preset.json → 拷贝，返 true。
+pub fn seed_preset_config(config_path: &Path, exe_dir: &Path) -> bool {
+    if config_path.exists() {
+        return false;
+    }
+    let preset = exe_dir.join("config.preset.json");
+    if !preset.exists() {
+        return false;
+    }
+    std::fs::copy(&preset, config_path).is_ok()
 }
 
 /// 原样读 dir/config.json，不做 workspace_dir 的 resolve 副作用（load_from 会把空字段重写成
@@ -582,6 +601,27 @@ mod tests {
         let d = Path::new("C:/fake/appdata");
         assert_eq!(resolve_cache_dir("", d), d.join("cache"));
         assert_eq!(resolve_cache_dir("   ", d), d.join("cache"));
+    }
+
+    #[test]
+    fn seed_preset_only_when_missing() {
+        // 首启播种：无 config + exe 旁有 preset → 拷贝；已有 config → 永不覆盖（老用户保护）。
+        let dir = tempfile::tempdir().unwrap();
+        let cfg_path = dir.path().join("config.json");
+        let exe_dir = dir.path().join("exe");
+        std::fs::create_dir_all(&exe_dir).unwrap();
+        std::fs::write(exe_dir.join("config.preset.json"), r#"{"bg_opacity":0.15}"#).unwrap();
+        // 无 config → 播种
+        assert!(seed_preset_config(&cfg_path, &exe_dir));
+        assert_eq!(std::fs::read_to_string(&cfg_path).unwrap(), r#"{"bg_opacity":0.15}"#);
+        // 已有 config → 不覆盖（返回 false 且内容原样）
+        std::fs::write(&cfg_path, r#"{"bg_opacity":0.9}"#).unwrap();
+        assert!(!seed_preset_config(&cfg_path, &exe_dir));
+        assert_eq!(std::fs::read_to_string(&cfg_path).unwrap(), r#"{"bg_opacity":0.9}"#);
+        // 无 preset 文件 → 不播种
+        let cfg_path2 = dir.path().join("sub").join("config.json");
+        std::fs::create_dir_all(dir.path().join("sub")).unwrap();
+        assert!(!seed_preset_config(&cfg_path2, dir.path()));
     }
     #[test]
     fn resolve_cache_dir_absolute_passthrough() {

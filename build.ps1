@@ -36,12 +36,19 @@ if (Get-Process ovoice -ErrorAction SilentlyContinue) {
     Start-Sleep -Seconds 1
 }
 New-Item -ItemType Directory -Force -Path $PORT | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $PORT "assets") | Out-Null
 try {
     Copy-Item "$TARGET\ovoice.exe" "$PORT\ovoice.exe" -Force
     Copy-Item "$TARGET\mem.exe"   "$PORT\mem.exe"   -Force
 } catch {
     throw "copy failed - ovoice.exe still locked. Run taskkill /F /IM ovoice.exe then retry."
 }
+
+Write-Host ""
+Write-Host "[4/4] bundle tuned preset (bg + config.preset.json)" -ForegroundColor Cyan
+Copy-Item "$ROOTesources\presetg.jpg" (Join-Path $PORT "assetsg.jpg") -Force
+Copy-Item "$ROOTesources\preset\config.preset.json" "$PORT\config.preset.json" -Force
+Write-Host "  OK assetsg.jpg + config.preset.json (first-run seed; existing users unaffected)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DONE - portable updated to latest:" -ForegroundColor Green

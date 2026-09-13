@@ -368,7 +368,10 @@ impl LlmRound for HttpRound {
         // 隔离名单：启动后首次请求恢复落盘名单；命中 hash 的污染文本直接换桩（零 422）。
         let cache = std::path::PathBuf::from(&cfg.cache_dir);
         quarantine_load(&cache);
-        let (messages_q, _hits) = apply_quarantine(messages);
+        let (mut messages_q, _hits) = apply_quarantine(messages);
+        // 发送前净化（纵深防御最后一道）：无论毒来自历史重建还是轮内实时追加，
+        // 每次请求前统一剥除双向孤儿 tool 交互（幂等；与 build_messages 同一规则）。
+        crate::context::strip_unpaired_tool_calls(&mut messages_q);
 
         // 内容风控净化级别：0=原文；1=半数 tool 结果；2=全部 tool 结果；3=+tool_call 参数；
         // 4=+回退截断（只保最近 2 turn）。422 sensitive 时逐级升级重试——常驻 agent 没有

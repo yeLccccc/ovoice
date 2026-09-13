@@ -10,7 +10,7 @@
 
 ## 功能
 
-### 🧠 一生记忆在线（核心设计：mem.exe + dream 四级记忆压缩）
+### 一生记忆在线（核心设计：mem.exe + dream 四级记忆压缩）
 
 长会话必然撑爆上下文，常见的"滑动窗口"等于让助手失忆。ovoice 的答案是一条**压缩-索引-下钻**流水线：
 
@@ -35,7 +35,7 @@ L1 日段 memory/{Y}/{M}/{date}.md ── L2 月档 ── L3 年档     ← 四
 
 深入设计见 [docs/memory.md](docs/memory.md)。
 
-### 🖼️ 富媒体渲染与文件工具
+### 富媒体渲染与文件工具
 
 agent 的产出不止纯文本——`display` 工具按类型直接在对话里渲染卡片：**Markdown**（含代码高亮）、**HTML 页面**（iframe + `media://` 协议服务相对资源，网页内图片/脚本不 404）、**图片 / 视频 / 音频**、**PDF / DOCX**（文档卡）、**CSV / 代码 / 配置**（只读文档卡）。反向的 `attach` 把 agent 看不到的文件纳入视野（PDF/DOCX 抽取文本当轮可读，图片下一轮注入视觉通道）。`edit_card` 则是左编辑右预览的可编辑卡片——助手把内容摆出来，用户手改点保存才落盘，人机协同改稿。
 
@@ -57,6 +57,35 @@ pnpm install
 pnpm tauri dev      # 开发
 ./build.ps1         # 绿色 portable 包（release/ovoice-portable/）
 ```
+
+## 让 AI Agent 替你部署
+
+把下面这段提示词直接投给 Claude Code、Codex CLI 或其他编码 agent，它会在你的机器上完成从零到可运行的部署：
+
+```text
+请在本机（Windows 10/11）完成 ovoice 桌面应用的构建与部署，逐步执行并在每步失败时自行排查：
+
+1. 环境检查与安装：
+   - Rust（MSVC 工具链，rustup）；确认 cargo 可用、已装 VS Build Tools（有 link.exe）
+   - Node.js >= 18 与 pnpm（npm i -g pnpm）
+   - WebView2 Runtime（Windows 11 一般自带）
+2. 获取源码：git clone https://github.com/yeLccccc/ovoice.git 并进入目录
+3. 安装依赖：pnpm install
+4. 构建：powershell -ExecutionPolicy Bypass -File build.ps1
+   产物为 release/ovoice-portable/（ovoice.exe + mem.exe + busybox64u.exe
+   + assets/bg.jpg + config.preset.json 调优预设）。
+   注意：src-tauri/binaries/busybox64u.exe 因许可不随仓库分发（.gitignore），
+   若缺失请从 https://frippery.org/busybox/ 下载放入该目录后重跑 build.ps1。
+5. 首次启动 release/ovoice-portable/ovoice.exe：确认窗口正常、设置页可打开。
+6. 配置（全部在设置页完成，密钥只落本机 config.json，严禁写进仓库文件）：
+   - MiniMax API Key（必需：对话 + TTS）
+   - 百度智能云语音凭据（可选：ASR 转写，AppID/API Key/Secret Key）
+   配置落盘 %APPDATA%/com.ovoice.app/config.json；agent 工作目录默认 Documents/ovoice。
+7. 验证：cargo test --manifest-path src-tauri/Cargo.toml --lib 应大部分通过；
+   mem_cli / mem_dream 模块的 18 个失败是仓库已知基线，不算回归。
+```
+
+不想本机构建的话，直接下载 [Release](https://github.com/yeLccccc/ovoice/releases) 里的 portable zip 解压运行即可，产物与自行构建相同。
 
 ## 配置
 

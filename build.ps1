@@ -46,9 +46,9 @@ try {
 
 Write-Host ""
 Write-Host "[4/4] bundle tuned preset (bg + config.preset.json)" -ForegroundColor Cyan
-Copy-Item "$ROOTesources\presetg.jpg" (Join-Path $PORT "assetsg.jpg") -Force
-Copy-Item "$ROOTesources\preset\config.preset.json" "$PORT\config.preset.json" -Force
-Write-Host "  OK assetsg.jpg + config.preset.json (first-run seed; existing users unaffected)" -ForegroundColor Green
+Copy-Item (Join-Path $ROOT "resources\preset\bg.jpg") (Join-Path $PORT "assets\bg.jpg") -Force
+Copy-Item (Join-Path $ROOT "resources\preset\config.preset.json") (Join-Path $PORT "config.preset.json") -Force
+Write-Host "  OK assets\bg.jpg + config.preset.json (first-run seed; existing users unaffected)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DONE - portable updated to latest:" -ForegroundColor Green

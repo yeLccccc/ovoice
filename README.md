@@ -10,9 +10,39 @@
 
 ## 功能
 
+### 🧠 一生记忆在线（核心设计：mem.exe + dream 四级记忆压缩）
+
+长会话必然撑爆上下文，常见的"滑动窗口"等于让助手失忆。ovoice 的答案是一条**压缩-索引-下钻**流水线：
+
+```
+history/*.jsonl（原始对话，append-only 永不删改）
+      │ dream：LLM 蒸馏（唯一写者）
+      ▼
+L1 日段 memory/{Y}/{M}/{date}.md ── L2 月档 ── L3 年档     ← 四级压缩，越往上越抽象
+      └──────────── L4 MEMORY.md 索引 ────────────┘
+                    （每轮 pinned 进 system prompt）
+```
+
+**"在线"靠三层可达，而非把所有历史塞进上下文**：
+
+1. **元记忆常驻**——MEMORY.md 索引每轮注入 system，模型永远知道"自己记得什么"；
+2. **蒸馏档按需下钻**——`mem_list / mem_read / mem_search` 检索任意层级的记忆档；
+3. **原文永不丢失**——每条日段带代码盖戳的 `seq[a,b]` 指针，`mem_history` 可回放 history 里的原始对话。蒸馏与原文双向可达，这才是"一生记忆"而非"摘要缓存"。
+
+上下文窗口由 dream marker **硬切**控制（空闲 2h 或上下文达 300k token 触发整理）：记忆进漏斗的瞬间，原文退出工作集但永不销毁。
+
+**mem.exe** 是独立记忆 CLI（同仓库第二个二进制）：零 LLM 只读下钻 + dream 写端一体。同一套实现三处复用——agent 的原生 mem_* 工具、bash 里直接敲 `mem`（人类与 agent 同一接口）、离线 `mem dream --mechanical`（无密钥也能机械整理）。记忆系统不依赖主程序存活，单进程即可浏览一生对话。
+
+深入设计见 [docs/memory.md](docs/memory.md)。
+
+### 🖼️ 富媒体渲染与文件工具
+
+agent 的产出不止纯文本——`display` 工具按类型直接在对话里渲染卡片：**Markdown**（含代码高亮）、**HTML 页面**（iframe + `media://` 协议服务相对资源，网页内图片/脚本不 404）、**图片 / 视频 / 音频**、**PDF / DOCX**（文档卡）、**CSV / 代码 / 配置**（只读文档卡）。反向的 `attach` 把 agent 看不到的文件纳入视野（PDF/DOCX 抽取文本当轮可读，图片下一轮注入视觉通道）。`edit_card` 则是左编辑右预览的可编辑卡片——助手把内容摆出来，用户手改点保存才落盘，人机协同改稿。
+
+### 基础能力
+
 - **语音交互**：热键按住说话、百度 ASR 转写、MiniMax TTS 朗读（可关）
 - **常驻会话**：事件驱动 driver；历史 = append-only JSONL（唯一真相源），上下文每轮从盘重建，重启不丢
-- **记忆系统（dream）**：空闲 2h 或上下文达 300k token 时，自动把近期历史整理进四级漏斗（日记忆 → 月/年摘要 → MEMORY.md 索引），marker 硬切控制上下文窗口
 - **子代理**：主 agent 可 spawn 后台子代理（write/read/edit/bash，干净上下文），完成自动回注结果；失败原因与部分产出诚实回传；螺旋熔断防死循环
 - **ask_user**：主 agent 主动向用户提问（候选项 + 自定义输入 + 15s 倒计时，超时自动选推荐项），回答以 tool_result 落盘
 - **任务管理**：sqlite 任务看板（Current/Short/Long/Vision 四视野）+ 精确 timer 调度
